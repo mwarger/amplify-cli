@@ -20,23 +20,6 @@ import {
 import { ResolverResourceIDs, ModelResourceIDs } from 'graphql-transformer-common'
 import { updateCreateInputWithConnectionField, updateUpdateInputWithConnectionField } from './definitions';
 
-interface QueryNameMap {
-    get?: string;
-    list?: string;
-    query?: string;
-}
-
-interface MutationNameMap {
-    create?: string;
-    update?: string;
-    delete?: string;
-}
-
-interface ModelDirectiveArgs {
-    queries?: QueryNameMap,
-    mutations?: MutationNameMap
-}
-
 function makeConnectionAttributeName(type: string, field?: string) {
     return field ? toCamelCase([type, field, 'id']) : toCamelCase([type, 'id'])
 }
@@ -304,7 +287,7 @@ export class ModelConnectionTransformer extends Transformer {
                 ctx.addEnum(modelSortDirection)
             }
 
-            this.generateFilterInputs(ctx, parent)
+            this.generateFilterInputs(ctx, returnType)
         } else {
             throw new InvalidDirectiveError(`Could not find a object or interface type named ${parent.name.value}.`)
         }

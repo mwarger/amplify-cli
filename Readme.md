@@ -8,6 +8,9 @@
   <a href="https://www.npmjs.com/package/@aws-amplify/cli">
     <img src="https://img.shields.io/npm/v/@aws-amplify/cli.svg" />
   </a>
+  <a href="https://circleci.com/gh/aws-amplify/amplify-cli">
+    <img src="https://img.shields.io/circleci/project/github/aws-amplify/amplify-cli/master.svg" alt="build:started">
+  </a>
 </p>
 
 
@@ -22,10 +25,11 @@ The AWS Amplify CLI is a toolchain which includes a robust feature set for simpl
 * [Contributing](#contributing)
 * [Start building your app](https://aws-amplify.github.io/media/get_started)
 
+> If you're using Windows, the CLI currently supports [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/install-win10).
 
 ## Install the CLI
 
- - Requires Node.js® version 8.x or later
+ - Requires Node.js® version 8.11.x or later
 
 
 Install and configure the Amplify CLI as follows:
@@ -70,6 +74,7 @@ The Amplify CLI supports the commands shown in the following table.
 - [React tutorial](amplifycli_react_tutorial.md)
 - [GraphQL transform tutorial](graphql-transform-tutorial.md)
 - [How to write your own GraphQL transformer](how-to-write-a-transformer.md)
+- [Native development with Amplify CLI and AWS AppSync](native_guide.md)
 
 
 ## Contributing
@@ -85,5 +90,5 @@ To test your category, do the following:<br>
 
 Before pushing code or sending a pull request, do the following:
 - At the command line, run `npm run lint` at the top-level directory. This invokes lerna to check for lint errors in all of our packages.
-- You can use `eslint` to fix some of the lint errors. To use it, go to the package that has errors and run `lint-fx`
+- You can use `eslint` to fix some of the lint errors. To use it, go to the package that has errors and run `lint-fix`
 - If there are any remaining lint errors, resolve them manually. Linting your code is a best practice that ensures good code quality so it's important that you don't skip this step. 

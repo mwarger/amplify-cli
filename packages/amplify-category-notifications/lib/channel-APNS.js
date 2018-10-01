@@ -1,8 +1,11 @@
 const inquirer = require('inquirer');
-const configureKey = require('./apns-key-config');
-const configureCertificate = require('./apns-cert-config');
+const ora = require('ora');
 
 const channelName = 'APNS';
+const spinner = ora('');
+
+const configureKey = require('./apns-key-config');
+const configureCertificate = require('./apns-cert-config');
 
 async function configure(context) {
   const isChannelEnabled =
@@ -59,10 +62,15 @@ async function enable(context, successMessage) {
 
   APNSChannelRequest.DefaultAuthenticationMethod = answers.DefaultAuthenticationMethod;
 
-  if (APNSChannelRequest.DefaultAuthenticationMethod === 'Key') {
-    keyConfig = await configureKey.run();
-  } else {
-    certificateConfig = await configureCertificate.run();
+  try {
+    if (APNSChannelRequest.DefaultAuthenticationMethod === 'Key') {
+      keyConfig = await configureKey.run();
+    } else {
+      certificateConfig = await configureCertificate.run();
+    }
+  } catch (err) {
+    context.print.error(err.message);
+    process.exit(1);
   }
 
   Object.assign(APNSChannelRequest, keyConfig, certificateConfig);
@@ -72,16 +80,17 @@ async function enable(context, successMessage) {
     APNSChannelRequest,
   };
 
+  spinner.start('Updating APNS Channel.');
   return new Promise((resolve, reject) => {
     context.exeInfo.pinpointClient.updateApnsChannel(params, (err, data) => {
       if (err) {
-        context.print.error('update channel error');
+        spinner.fail('update channel error');
         reject(err);
       } else {
         if (!successMessage) {
           successMessage = `The ${channelName} channel has been successfully enabled.`;
         }
-        context.print.info(successMessage);
+        spinner.succeed(successMessage);
         context.exeInfo.serviceMeta.output[channelName] = data.APNSChannelResponse;
         resolve(data);
       }
@@ -96,13 +105,14 @@ function disable(context) {
       Enabled: false,
     },
   };
+  spinner.start('Updating APNS Channel.');
   return new Promise((resolve, reject) => {
     context.exeInfo.pinpointClient.updateApnsChannel(params, (err, data) => {
       if (err) {
-        context.print.error('update channel error');
+        spinner.fail('update channel error');
         reject(err);
       } else {
-        context.print.info(`The ${channelName} channel has been disabled.`);
+        spinner.succeed(`The ${channelName} channel has been disabled.`);
         context.exeInfo.serviceMeta.output[channelName] = data.APNSChannelResponse;
         resolve(data);
       }

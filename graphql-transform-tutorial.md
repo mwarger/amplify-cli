@@ -158,7 +158,7 @@ query GetBlog($blogId:ID!) {
 
 # List all blogs, their posts, and their posts comments.
 query ListBlogs {
-  listBlog { # Try adding: listBlog(filter: { name: { eq: "My New Blog!" } })
+  listBlogs { # Try adding: listBlog(filter: { name: { eq: "My New Blog!" } })
     items {
       id
       name
@@ -675,6 +675,8 @@ of the input field via the **versionField** and **versionInput** arguments on th
 
 The `@searchable` directive handles streaming the data of an `@model` object type to
 Amazon Elasticsearch Service and configures search resolvers that search that information.
+
+> Note: Support for adding the `@searchable` directive does not yet provide automatic indexing for any existing data to Elasticsearch. View the feature request [here](https://github.com/aws-amplify/amplify-cli/issues/98).
 
 #### Definition
 

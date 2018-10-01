@@ -4,6 +4,7 @@ const moment = require('moment');
 const configurables = {
   Website: './helpers/configure-Website',
   CloudFront: './helpers/configure-CloudFront',
+  Publish: './helpers/configure-Publish',
 };
 
 async function init(context) {
@@ -23,7 +24,7 @@ async function init(context) {
 
   context.exeInfo.template.Resources.S3Bucket.Properties.BucketName = answers.HostingBucketName;
 
-  const configureModule = require(configurables['Website']);
+  const configureModule = require(configurables.Website);
   await configureModule.configure(context);
 }
 

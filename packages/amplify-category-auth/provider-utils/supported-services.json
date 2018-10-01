@@ -73,7 +73,7 @@
 			{
 				"key": "thirdPartyAuth",
 				"question": "Do you want to enable 3rd party authentication providers in your identity pool?",
-				"learnMore": "If you select yes, your identity pool will support users who are authenticated via a public login provider such as Facebook, Google, Twitter and Amazon (non-Cognito).  Your identity pool will continue to support users who are authenticated via a user pool.",
+				"learnMore": "If you select yes, your identity pool will support users who are authenticated via a public login provider such as Facebook, Google, and Amazon (non-Cognito).  Your identity pool will continue to support users who are authenticated via a user pool.",
 				"temp": true,
 				"type": "list",
 				"map": "booleanOptions",
@@ -180,31 +180,6 @@
 				]
 			},
 			{
-				"key": "twitterConsumerKey",
-				"prefix": " \n You've opted to allow users to authenticate via Twitter.  If you haven't already, you'll need to create a Twitter Consumer Key and a Twitter Consumer Secret. \n",
-				"question": "Enter your Twitter Consumer Key: ",
-				"required": true,
-				"andConditions": [
-					{
-						"key": "authProviders",
-						"value": "api.twitter.com",
-						"operator": "includes"
-					}
-				]
-			},
-			{
-				"key": "twitterConsumerSecret",
-				"question": "Enter your Twitter Consumer Secret: ",
-				"required": true,
-				"andConditions": [
-					{
-						"key": "authProviders",
-						"value": "api.twitter.com",
-						"operator": "includes"
-					}
-				]
-			},
-			{
 				"key": "userPoolName",
 				"question": "Please provide a name for your user pool:",
 				"required": true,
@@ -239,7 +214,12 @@
 					},
 					{
 						"key": "mfaConfiguration",
-						"value": "OFF",
+						"value": "ON",
+						"preventEdit": "="
+					},
+					{
+						"key": "mfaConfiguration",
+						"value": "OPTIONAL",
 						"preventEdit": "="
 					}
 				],
@@ -434,6 +414,10 @@
 				"type": "multiselect",
 				"map": "coreAttributes",
 				"andConditions": [
+					{
+						"preventEdit": "exists",
+						"key": "userPoolName"
+					},
 					{
 						"key": "authSelections",
 						"value": "identityPoolOnly",
