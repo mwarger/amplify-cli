@@ -2,6 +2,7 @@ const inquirer = require('inquirer');
 const path = require('path');
 const fs = require('fs-extra');
 
+const providerName = 'awscloudformation';
 const category = 'analytics';
 const parametersFileName = 'parameters.json';
 const serviceName = 'Pinpoint';
@@ -94,7 +95,7 @@ function configure(context, defaultValuesFilename, serviceMetadata, resourceName
 
       if (foundUnmetRequirements) {
         context.print.warning('Adding analytics would add the Auth category to the project if not already added.');
-        if (await context.prompt.confirm('Apps need authorization to send analytics events. Do you want to allow guests and unauthenticated users to send analytics events? (we recommend you allow this when getting started)')) {
+        if (await amplify.confirmPrompt.run('Apps need authorization to send analytics events. Do you want to allow guests and unauthenticated users to send analytics events? (we recommend you allow this when getting started)')) {
           try {
             await externalAuthEnable(context, 'api', answers.resourceName, apiRequirements);
           } catch (e) {
@@ -115,15 +116,8 @@ function configure(context, defaultValuesFilename, serviceMetadata, resourceName
 
       const resourceDirPath = path.join(projectBackendDirPath, category, resource);
       delete defaultValues.resourceName;
-      fs.ensureDirSync(resourceDirPath);
-      const parametersFilePath = path.join(resourceDirPath, parametersFileName);
-      const jsonString = JSON.stringify(defaultValues, null, 4);
-      fs.writeFileSync(parametersFilePath, jsonString, 'utf8');
-
-      const templateFilePath = path.join(resourceDirPath, templateFileName);
-      if (!fs.existsSync(templateFilePath)) {
-        fs.copySync(`${__dirname}/../cloudformation-templates/${templateFileName}`, templateFilePath);
-      }
+      writeParams(resourceDirPath, defaultValues);
+      writeCfnFile(context, resourceDirPath);
       return resource;
     });
 }
@@ -162,6 +156,41 @@ function resourceAlreadyExists(context) {
   }
 
   return resourceName;
+}
+
+function writeCfnFile(context, resourceDirPath, force = false) {
+  fs.ensureDirSync(resourceDirPath);
+  const templateFilePath = path.join(resourceDirPath, templateFileName);
+  if (!fs.existsSync(templateFilePath) || force) {
+    const templateSourceFilePath = `${__dirname}/../cloudformation-templates/${templateFileName}`;
+    const templateSource = JSON.parse(fs.readFileSync(templateSourceFilePath));
+    templateSource.Mappings = getTemplateMappings(context);
+    const jsonString = JSON.stringify(templateSource, null, 4);
+    fs.writeFileSync(templateFilePath, jsonString, 'utf8');
+  }
+}
+
+function getTemplateMappings(context) {
+  const Mappings = {
+    RegionMapping: {
+    },
+  };
+  const providerPlugins = context.amplify.getProviderPlugins(context);
+  const provider = require(providerPlugins[providerName]);
+  const regionMapping = provider.getPinpointRegionMapping(context);
+  Object.keys(regionMapping).forEach((region) => {
+    Mappings.RegionMapping[region] = {
+      pinpointRegion: regionMapping[region],
+    };
+  });
+  return Mappings;
+}
+
+function writeParams(resourceDirPath, values) {
+  fs.ensureDirSync(resourceDirPath);
+  const parametersFilePath = path.join(resourceDirPath, parametersFileName);
+  const jsonString = JSON.stringify(values, null, 4);
+  fs.writeFileSync(parametersFilePath, jsonString, 'utf8');
 }
 
 module.exports = { addWalkthrough };

@@ -12,6 +12,7 @@ const AppSyncTransformer = require('graphql-appsync-transformer').default;
 const ModelConnectionTransformer = require('graphql-connection-transformer').default;
 const SearchableModelTransformer = require('graphql-elasticsearch-transformer').default;
 const VersionedModelTransformer = require('graphql-versioned-transformer').default;
+const providerName = require('./constants').ProviderName;
 
 const category = 'api';
 const parametersFileName = 'parameters.json';
@@ -26,6 +27,11 @@ Run \`amplify update api\` and choose "Amazon Cognito User Pool" as the authoriz
 }
 
 async function transformGraphQLSchema(context, options) {
+  const flags = context.parameters.options;
+  if ('gql-override' in flags && !flags['gql-override']) {
+    return;
+  }
+
   let { resourceDir, parameters } = options;
   // const { noConfig } = options;
 
@@ -40,6 +46,9 @@ async function transformGraphQLSchema(context, options) {
     // There can only be one appsync resource
     if (resources.length > 0) {
       const resource = resources[0];
+      if (resource.providerPlugin !== providerName) {
+        return;
+      }
       const { category, resourceName } = resource;
       const backEndDir = context.amplify.pathManager.getBackendDirPath();
       resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
@@ -120,7 +129,7 @@ async function transformGraphQLSchema(context, options) {
     resources which would be created for you as a
      part of the AppSync service.`);
 
-    if (await context.prompt.confirm('Do you want to use your own
+    if (await context.amplify.confirmPrompt.run('Do you want to use your own
       tables instead?')) {
       let continueConfiguringDyanmoTables = true;
 

@@ -2,6 +2,8 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as handlebars from 'handlebars'
 import * as prettier from 'prettier'
+const camelCase = require('camel-case')
+
 import {
   buildClientSchema,
   DocumentNode,
@@ -18,6 +20,7 @@ const FILE_EXTENSION_MAP = {
   graphql: 'graphql',
   flow: 'js',
   typescript: 'ts',
+  angular: 'graphql',
 }
 
 function generate(
@@ -40,6 +43,8 @@ function generate(
   const maxDepth = options.maxDepth || 3
   const gqlOperations: GQLAllOperations = generateAllOps(schema, maxDepth)
   registerPartials()
+  registerHelpers()
+
   const fileExtension = FILE_EXTENSION_MAP[language]
   if (options.separateFiles) {
     ['queries', 'mutations', 'subscriptions'].forEach((op) => {
@@ -66,8 +71,9 @@ function renderOps(operations: Array<GQLTemplateOp>, language: string = 'graphql
   const templateFiles = {
     javascript: 'javascript.hbs',
     graphql: 'graphql.hbs',
-    typescript: 'javascript.hbs',
-    flow: 'javascript.hbs',
+    typescript: 'typescript.hbs',
+    flow: 'flow.hbs',
+    angular: 'graphql.hbs',
   }
 
   const templatePath = path.join(TEMPLATE_DIR, templateFiles[language])
@@ -94,12 +100,22 @@ function registerPartials() {
   })
 }
 
+function registerHelpers() {
+  handlebars.registerHelper('format', function(options: any) {
+    const result = options.fn(this)
+    return format(result)
+  })
+
+  handlebars.registerHelper('camelCase', camelCase)
+}
+
 function format(str: string, language: string = 'graphql'): string {
   const parserMap = {
     javascript: 'babylon',
     graphql: 'graphql',
     typescript: 'typescript',
     flow: 'flow',
+    angular: 'graphql',
   }
   return prettier.format(str, { parser: parserMap[language] })
 }

@@ -55,6 +55,8 @@ function createAWSExports(context, amplifyResources) {
         break;
       case 'S3AndCloudFront': Object.assign(configOutput, getS3AndCloudFrontConfig(serviceResourceMapping[service], projectRegion));
         break;
+      case 'Lex': Object.assign(configOutput, getLexConfig(serviceResourceMapping[service], projectRegion));
+        break;
       default: break;
     }
   });
@@ -148,7 +150,7 @@ function getPinpointConfig(pinpointResources) {
 
   return {
     aws_mobile_analytics_app_id: pinpointResource.output.Id,
-    aws_mobile_analytics_app_region: 'us-east-1',
+    aws_mobile_analytics_app_region: pinpointResource.output.Region,
   };
 }
 
@@ -181,5 +183,17 @@ function getS3AndCloudFrontConfig(s3AndCloudfrontResources) {
   };
 }
 
+function getLexConfig(lexResources) {
+  const config = lexResources.map(r => ({
+    name: r.output.BotName,
+    alias: '$LATEST',
+    region: r.output.Region,
+  }));
+
+  return {
+    aws_bots: 'enable',
+    aws_bots_config: config,
+  };
+}
 
 module.exports = { createAWSExports, createAmplifyConfig };

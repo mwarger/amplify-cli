@@ -1,12 +1,37 @@
 const inquirer = require('inquirer');
 const fs = require('fs-extra');
 const path = require('path');
+const opn = require('opn');
 
 const category = 'api';
 const serviceName = 'AppSync';
 const parametersFileName = 'parameters.json';
 const schemaFileName = 'schema.graphql';
+const providerName = 'awscloudformation';
 
+function openConsole(context) {
+  const amplifyMeta = context.amplify.getProjectMeta();
+  const categoryAmplifyMeta = amplifyMeta[category];
+  let appSyncMeta;
+  Object.keys((categoryAmplifyMeta)).forEach((resourceName) => {
+    if (categoryAmplifyMeta[resourceName].service === serviceName &&
+      categoryAmplifyMeta[resourceName].output) {
+      appSyncMeta = categoryAmplifyMeta[resourceName].output;
+    }
+  });
+
+
+  if (appSyncMeta) {
+    const { GraphQLAPIIdOutput } = appSyncMeta;
+    const { Region } = amplifyMeta.providers[providerName];
+
+    const consoleUrl =
+          `https://console.aws.amazon.com/appsync/home?region=${Region}#/${GraphQLAPIIdOutput}/v1/queries`;
+    opn(consoleUrl, { wait: false });
+  } else {
+    context.print.error('AppSync API is not pushed in the cloud.');
+  }
+}
 
 async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadata) {
   const resourceName = resourceAlreadyExists(context);
@@ -91,7 +116,7 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   // The user doesn't have an annotated schema file
 
-  if (!await context.prompt.confirm('Do you want a guided schema creation?')) {
+  if (!await amplify.confirmPrompt.run('Do you want a guided schema creation?')) {
     // Copy the most basic schema onto the users resource dir and transform that
 
     const targetSchemaFilePath = `${resourceDir}/${schemaFileName}`;
@@ -183,6 +208,7 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
           }
           notCompiled = false;
         }
+
         return { answers: resourceAnswers, output: { securityType: authType }, noCfnFile: true };
       });
   }
@@ -199,9 +225,14 @@ async function updateWalkthrough(context) {
   let resourceDir;
   let resourceName;
   const resources = allResources.filter(resource => resource.service === 'AppSync');
+
   // There can only be one appsync resource
   if (resources.length > 0) {
     const resource = resources[0];
+    if (resource.providerPlugin !== providerName) {
+      // TODO: Move message string to seperate file
+      throw new Error(`The selected resource is not managed using AWS Cloudformation. Please use the AWS AppSync Console to make updates to your API - ${resource.resourceName}`);
+    }
     ({ resourceName } = resource);
     const backEndDir = context.amplify.pathManager.getBackendDirPath();
     resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
@@ -319,4 +350,4 @@ function checkIfAuthExists(context) {
 }
 
 
-module.exports = { serviceWalkthrough, updateWalkthrough };
+module.exports = { serviceWalkthrough, updateWalkthrough, openConsole };

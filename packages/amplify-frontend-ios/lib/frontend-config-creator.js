@@ -40,6 +40,8 @@ function createAWSConfig(context, amplifyResources) {
         break;
       case 'AppSync': Object.assign(configOutput, getAppSyncConfig(serviceResourceMapping[service], projectRegion));
         break;
+      case 'Lex': Object.assign(configOutput, getLexConfig(serviceResourceMapping[service], projectRegion));
+        break;
       default: break;
     }
   });
@@ -134,12 +136,12 @@ function getPinpointConfig(pinpointResources) {
     PinpointAnalytics: {
       Default: {
         AppId: pinpointResource.output.Id,
-        Region: 'us-east-1',
+        Region: pinpointResource.output.Region,
       },
     },
     PinpointTargeting: {
       Default: {
-        Region: 'us-east-1',
+        Region: pinpointResource.output.Region,
       },
     },
   };
@@ -167,6 +169,20 @@ function getAppSyncConfig(appsyncResources, projectRegion) {
         ApiKey: appsyncResource.output.securityType === 'API_KEY' ? appsyncResource.output.GraphQLAPIKeyOutput : undefined,
       },
     },
+  };
+}
+
+function getLexConfig(lexResources) {
+  const config = {};
+  lexResources.forEach((r) => {
+    config[r.output.BotName] = {
+      Name: r.output.BotName,
+      Alias: '$LATEST',
+      Region: r.output.Region,
+    };
+  });
+  return {
+    Lex: config,
   };
 }
 

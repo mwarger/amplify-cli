@@ -15,13 +15,30 @@ import {
 } from 'graphql-dynamodb-transformer'
 import {
     getBaseType, isListType, getDirectiveArgument, blankObject,
-    toCamelCase
+    isScalar, STANDARD_SCALARS,
+    toCamelCase, isNonNullType
 } from 'graphql-transformer-common'
 import { ResolverResourceIDs, ModelResourceIDs } from 'graphql-transformer-common'
 import { updateCreateInputWithConnectionField, updateUpdateInputWithConnectionField } from './definitions';
 
 function makeConnectionAttributeName(type: string, field?: string) {
     return field ? toCamelCase([type, field, 'id']) : toCamelCase([type, 'id'])
+}
+
+function validateKeyField(field: FieldDefinitionNode): void {
+    if (!field) {
+        return
+    }
+    const baseType = getBaseType(field.type);
+    const isAList = isListType(field.type)
+    // The only valid key fields are single String and ID fields.
+    if (
+        (baseType === 'ID' || baseType === 'String') &&
+        (!isAList)
+    ) {
+        return;
+    }
+    throw new InvalidDirectiveError(`If you define a field and specify it as a 'keyField', it must be of type 'ID' or 'String'.`)
 }
 
 /**
@@ -37,7 +54,7 @@ export class ModelConnectionTransformer extends Transformer {
     constructor() {
         super(
             'ModelConnectionTransformer',
-            `directive @connection(name: String, keyField: String) on FIELD_DEFINITION`
+            `directive @connection(name: String, keyField: String, sortField: String) on FIELD_DEFINITION`
         )
         this.resources = new ResourceFactory();
     }
@@ -79,13 +96,18 @@ export class ModelConnectionTransformer extends Transformer {
         }
 
         let connectionName = getDirectiveArgument(directive)("name")
+        let associatedSortFieldName = null
+        let sortType = null
         // Find the associated connection field if one exists.
         const associatedConnectionField = relatedType.fields.find(
             (f: FieldDefinitionNode) => {
                 const relatedDirective = f.directives.find((dir: DirectiveNode) => dir.name.value === 'connection');
                 if (relatedDirective) {
                     const relatedDirectiveName = getDirectiveArgument(relatedDirective)("name")
-                    return connectionName && relatedDirectiveName && relatedDirectiveName === connectionName
+                    if (connectionName && relatedDirectiveName && relatedDirectiveName === connectionName) {
+                        associatedSortFieldName = getDirectiveArgument(relatedDirective)('sortField')
+                        return true
+                    }
                 }
                 return false
             }
@@ -99,9 +121,28 @@ export class ModelConnectionTransformer extends Transformer {
 
         connectionName = connectionName || `${parentTypeName}.${fieldName}`
         const leftConnectionIsList = isListType(field.type)
+        const leftConnectionIsNonNull = isNonNullType(field.type)
         const rightConnectionIsList = associatedConnectionField ? isListType(associatedConnectionField.type) : undefined
+        const rightConnectionIsNonNull = associatedConnectionField ? isNonNullType(associatedConnectionField.type) : undefined
 
         let connectionAttributeName = getDirectiveArgument(directive)("keyField")
+        const associatedSortField = associatedSortFieldName &&
+            parent.fields.find((f: FieldDefinitionNode) => f.name.value === associatedSortFieldName)
+
+        if (associatedSortField) {
+            if (isListType(associatedSortField.type)) {
+                throw new InvalidDirectiveError(
+                    `sortField "${associatedSortFieldName}" is a list. It should be a scalar.`
+                )
+            }
+            sortType = getBaseType(associatedSortField.type)
+            if (!isScalar(associatedSortField.type) || sortType === STANDARD_SCALARS.Boolean) {
+                throw new InvalidDirectiveError(
+                    `sortField "${associatedSortFieldName}" is of type "${sortType}". ` +
+                    `It should be a scalar that maps to a DynamoDB "String", "Number", or "Binary"`
+                )
+            }
+        }
 
         // Relationship Cardinalities:
         // 1. [] to []
@@ -120,6 +161,10 @@ export class ModelConnectionTransformer extends Transformer {
             if (!connectionAttributeName) {
                 connectionAttributeName = makeConnectionAttributeName(relatedTypeName, associatedConnectionField.name.value)
             }
+            // Validate the provided key field is legit.
+            const existingKeyField = relatedType.fields.find(f => f.name.value === connectionAttributeName)
+            validateKeyField(existingKeyField);
+
             const queryResolver = this.resources.makeQueryConnectionResolver(
                 parentTypeName,
                 fieldName,
@@ -135,12 +180,26 @@ export class ModelConnectionTransformer extends Transformer {
             // Store foreign key on this table and wire up a GetItem resolver.
             // This is the inverse of 2.
 
+            // if the sortField is not defined as a field, throw an error
+            // Cannot assume the required type of the field
+            if (associatedSortFieldName && !associatedSortField) {
+                throw new InvalidDirectiveError(
+                    `sortField "${associatedSortFieldName}" not found on type "${parent.name.value}", other half of connection "${connectionName}".`
+                )
+            }
+
             if (!connectionAttributeName) {
                 connectionAttributeName = makeConnectionAttributeName(parentTypeName, fieldName)
             }
+            // Validate the provided key field is legit.
+            const existingKeyField = parent.fields.find(f => f.name.value === connectionAttributeName)
+            validateKeyField(existingKeyField);
+
             const tableLogicalId = ModelResourceIDs.ModelTableResourceID(parentTypeName)
             const table = ctx.getResource(tableLogicalId) as Table
-            const updated = this.resources.updateTableForConnection(table, connectionName, connectionAttributeName)
+            const sortField = associatedSortField ? { name: associatedSortFieldName, type: sortType } : null
+            const updated = this.resources.updateTableForConnection(table, connectionName, connectionAttributeName,
+                sortField)
             ctx.setResource(tableLogicalId, updated)
 
             const getResolver = this.resources.makeGetItemConnectionResolver(
@@ -155,7 +214,7 @@ export class ModelConnectionTransformer extends Transformer {
             const createInputName = ModelResourceIDs.ModelCreateInputObjectName(parentTypeName)
             const createInput = ctx.getType(createInputName) as InputObjectTypeDefinitionNode
             if (createInput) {
-                const updated = updateCreateInputWithConnectionField(createInput, connectionAttributeName)
+                const updated = updateCreateInputWithConnectionField(createInput, connectionAttributeName, leftConnectionIsNonNull)
                 ctx.putType(updated)
             }
             const updateInputName = ModelResourceIDs.ModelUpdateInputObjectName(parentTypeName)
@@ -172,6 +231,10 @@ export class ModelConnectionTransformer extends Transformer {
             if (!connectionAttributeName) {
                 connectionAttributeName = makeConnectionAttributeName(parentTypeName, fieldName)
             }
+
+            // Validate the provided key field is legit.
+            const existingKeyField = relatedType.fields.find(f => f.name.value === connectionAttributeName)
+            validateKeyField(existingKeyField);
 
             const tableLogicalId = ModelResourceIDs.ModelTableResourceID(relatedTypeName)
             const table = ctx.getResource(tableLogicalId) as Table
@@ -209,6 +272,11 @@ export class ModelConnectionTransformer extends Transformer {
             if (!connectionAttributeName) {
                 connectionAttributeName = makeConnectionAttributeName(parentTypeName, fieldName)
             }
+
+            // Validate the provided key field is legit.
+            const existingKeyField = parent.fields.find(f => f.name.value === connectionAttributeName)
+            validateKeyField(existingKeyField);
+
             const getResolver = this.resources.makeGetItemConnectionResolver(
                 parentTypeName,
                 fieldName,
@@ -221,7 +289,7 @@ export class ModelConnectionTransformer extends Transformer {
             const createInputName = ModelResourceIDs.ModelCreateInputObjectName(parentTypeName)
             const createInput = ctx.getType(createInputName) as InputObjectTypeDefinitionNode
             if (createInput) {
-                const updated = updateCreateInputWithConnectionField(createInput, connectionAttributeName)
+                const updated = updateCreateInputWithConnectionField(createInput, connectionAttributeName, leftConnectionIsNonNull)
                 ctx.putType(updated)
             }
             const updateInputName = ModelResourceIDs.ModelUpdateInputObjectName(parentTypeName)

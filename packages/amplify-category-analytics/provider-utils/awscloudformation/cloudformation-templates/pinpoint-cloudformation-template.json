@@ -134,7 +134,6 @@
                             [
                                 "const response = require('cfn-response');",
                                 "const aws = require('aws-sdk');",
-                                "const pinpoint = new aws.Pinpoint({ apiVersion: '2016-12-01', region: 'us-east-1' });",
                                 "exports.handler = function(event, context) {",
                                 "    if (event.RequestType == 'Delete') {",
                                 "        response.send(event, context, response.SUCCESS);",
@@ -152,6 +151,7 @@
                                 "               Name: appName",
                                 "           }",
                                 "       };",
+                                "       const pinpoint = new aws.Pinpoint({ apiVersion: '2016-12-01', region: event.ResourceProperties.region });",
                                 "       return pinpoint.createApp(params).promise()",
                                 "           .then((res) => {",
                                 "               responseData = res.ApplicationResponse;",
@@ -188,6 +188,13 @@
                         "PinpointFunction",
                         "Arn"
                     ]
+                }, 
+                "region": { 
+                    "Fn::FindInMap" : [ 
+                        "RegionMapping", 
+                        { "Ref" : "AWS::Region" }, 
+                        "pinpointRegion"
+                    ]
                 },
                 "appName": {
                     "Ref": "appName"
@@ -208,15 +215,7 @@
                   {
                     "Effect": "Allow",
                     "Action": [
-                        "mobileanalytics:PutEvents"
-                    ],
-                    "Resource": [
-                        "*"
-                    ]
-                  },
-                  {
-                    "Effect": "Allow",
-                    "Action": [
+                        "mobiletargeting:PutEvents",
                         "mobiletargeting:UpdateEndpoint"
                     ],
                     "Resource": [
@@ -284,15 +283,7 @@
                   {
                     "Effect": "Allow",
                     "Action": [
-                        "mobileanalytics:PutEvents"
-                    ],
-                    "Resource": [
-                        "*"
-                    ]
-                  },
-                  {
-                    "Effect": "Allow",
-                    "Action": [
+                        "mobiletargeting:PutEvents",
                         "mobiletargeting:UpdateEndpoint"
                     ],
                     "Resource": [
@@ -349,7 +340,13 @@
     },
     "Outputs": {
         "Region": {
-            "Value": "us-east-1"
+            "Value":{ 
+                "Fn::FindInMap" : [ 
+                    "RegionMapping", 
+                    { "Ref" : "AWS::Region" }, 
+                    "pinpointRegion"
+                ]
+            }
         },
         "Id": {
             "Value": {
